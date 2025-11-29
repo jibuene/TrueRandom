@@ -7,22 +7,31 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"sync"
 
 	"github.com/adeithe/go-twitch/api"
 	"github.com/gempir/go-twitch-irc/v4"
 )
 
-const (
-	ClientID        = ""
-	ClientSecret    = ""
-	messagesToFetch = 2
-	streamsToFetch  = 2
+var (
+	CLIENT_ID     = os.Getenv("TWITCH_CLIENT_ID")
+	CLIENT_SECRET = os.Getenv("TWITCH_CLIENT_SECRET")
 )
 
-func DoTwitchRequest() [messagesToFetch * streamsToFetch]string {
+const (
+	messagesToFetch = 5
+	streamsToFetch  = 3
+)
+
+// FetchTwitchMessages fetches chat messages from live Twitch streams.
+// It finds the top `streamsToFetch` live streams and listens to their chat channels,
+// collecting `messagesToFetch` messages from each stream.
+// It returns an array of collected messages.
+func FetchTwitchMessages() [messagesToFetch * streamsToFetch]string {
 	ctx := context.Background()
-	token := fetch_token()
-	client := api.New(ClientID, api.WithDefaultBearerToken(token))
+	token := fetchOauthToken()
+	client := api.New(CLIENT_ID, api.WithDefaultBearerToken(token))
 
 	streams, err := client.Streams.List().First(streamsToFetch).Do(ctx)
 	if err != nil {
@@ -30,25 +39,28 @@ func DoTwitchRequest() [messagesToFetch * streamsToFetch]string {
 	}
 
 	var all_messages [messagesToFetch * streamsToFetch]string
+	var wg sync.WaitGroup
 
 	for streamIdx, stream := range streams.Data {
-		// fmt.Printf("%s is streaming %s to %d viewers\n",
-		// 	stream.UserLogin,
-		// 	stream.GameName,
-		// 	stream.ViewerCount,
-		// )
-		msg := listen_to_chat(stream.UserLogin)
+		wg.Go(func() {
+			msg := listenToChat(stream.UserLogin)
 
-		for i, m := range msg {
-			currentIdx := streamIdx*messagesToFetch + i
-			all_messages[currentIdx] = m
-		}
+			for i, m := range msg {
+				currentIdx := streamIdx*messagesToFetch + i
+				all_messages[currentIdx] = m
+			}
+		})
 	}
+
+	wg.Wait()
 
 	return all_messages
 }
 
-func listen_to_chat(channel string) [messagesToFetch]string {
+// listenToChat connects to a Twitch chat channel and listens for messages.
+// It collects `messagesToFetch` messages and then disconnects.
+// It returns an array of collected messages.
+func listenToChat(channel string) [messagesToFetch]string {
 	var messages [messagesToFetch]string
 	var count int = 0
 
@@ -84,35 +96,31 @@ type TokenResponse struct {
 	TokenType   string `json:"token_type"`
 }
 
-func fetch_token() string {
+// fetchOauthToken fetches an OAuth token from Twitch using client credentials.
+func fetchOauthToken() string {
 	// Twitch OAuth token endpoint
 	tokenURL := "https://id.twitch.tv/oauth2/token"
 
-	// Build the form data
 	data := url.Values{}
-	data.Set("client_id", ClientID)
-	data.Set("client_secret", ClientSecret)
+	data.Set("client_id", CLIENT_ID)
+	data.Set("client_secret", CLIENT_SECRET)
 	data.Set("grant_type", "client_credentials")
 
-	// Make the POST request
 	resp, err := http.PostForm(tokenURL, data)
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 
-	// Read the response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		panic(err)
 	}
 
-	// Check for non-200 status
 	if resp.StatusCode != http.StatusOK {
 		panic(fmt.Sprintf("Failed to get token: %s", body))
 	}
 
-	// Parse JSON
 	var token TokenResponse
 	if err := json.Unmarshal(body, &token); err != nil {
 		panic(err)

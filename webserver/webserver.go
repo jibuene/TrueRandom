@@ -2,69 +2,32 @@ package webserver
 
 import (
 	"fmt"
-	"github.com/jibuene/true-rand/twitch"
-	"math/big"
+	"github.com/jibuene/true-rand/random-number"
 	"net/http"
-	"strconv"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
-
-	fmt.Fprintf(w, "hello\n")
-}
-
-func headers(w http.ResponseWriter, req *http.Request) {
-
-	for name, headers := range req.Header {
-		for _, h := range headers {
-			fmt.Fprintf(w, "%v: %v\n", name, h)
-		}
-	}
-}
+var realRandom = randomnumber.New(randomnumber.TwitchMessages)
+var notRandom = randomnumber.New(randomnumber.NotRandom)
 
 func getTrueRandom(w http.ResponseWriter, req *http.Request) {
+	realRandom.Generate()
 
-	twitchmsgs := twitchmsg.DoTwitchRequest()
-	num := numbeFromString(twitchmsgs[:]...)
-
-	fmt.Fprintf(w, "Twitch Messages Used:\n")
-	for _, msg := range twitchmsgs {
-		fmt.Fprintf(w, "Twitch Message: %s\n", msg)
-	}
-
-	fmt.Fprintf(w, "True Random Number: %s\n", num.String())
+	response := fmt.Sprintf("Random Number: %s\nBasis: %s\n", realRandom.Number.String(), realRandom.Basis)
+	w.Write([]byte(response))
 }
 
-func isInterger(s string) bool {
-	_, err := strconv.Atoi(s)
-	return err == nil
-}
+func getNotRandom(w http.ResponseWriter, req *http.Request) {
+	notRandom.Generate()
 
-func numbeFromString(strings ...string) *big.Int {
-	var result string
-	for _, s := range strings {
-		for _, r := range s {
-			intStr := fmt.Sprintf("%X", r)
-			if isInterger(intStr) {
-				result += intStr
-			}
-		}
-	}
-
-	bigInt, success := new(big.Int).SetString(result, 16)
-	if !success {
-		panic("Failed to convert string to big.Int")
-	}
-
-	return bigInt
+	response := fmt.Sprintf("Random Number: %s\nBasis: %s\n", notRandom.Number.String(), notRandom.Basis)
+	w.Write([]byte(response))
 }
 
 func StartServer() {
-
-	http.HandleFunc("/hello", hello)
-	http.HandleFunc("/headers", headers)
 	http.HandleFunc("/random", getTrueRandom)
+	http.HandleFunc("/notrandom", getNotRandom)
 
-	fmt.Println("Web server is running on http://localhost:8090")
-	http.ListenAndServe(":8090", nil)
+	port := ":8090"
+	fmt.Println("Web server is running on http://localhost" + port)
+	http.ListenAndServe(port, nil)
 }
