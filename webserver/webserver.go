@@ -26,6 +26,8 @@ func getNotRandom(w http.ResponseWriter, req *http.Request) {
 func StartServer() {
 	http.HandleFunc("/random", getTrueRandom)
 	http.HandleFunc("/notrandom", getNotRandom)
+	http.HandleFunc("/", mainFrontEnd)
+	http.HandleFunc("/randomNumber", randomNumberFrontend)
 
 	port := ":8090"
 	fmt.Println("Web server is running on http://localhost" + port)

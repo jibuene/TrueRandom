@@ -43,6 +43,7 @@ func FetchTwitchMessages() [messagesToFetch * streamsToFetch]string {
 
 	for streamIdx, stream := range streams.Data {
 		wg.Go(func() {
+			fmt.Println("Listening to chat for channel:", stream.UserLogin)
 			msg := listenToChat(stream.UserLogin)
 
 			for i, m := range msg {
@@ -67,7 +68,6 @@ func listenToChat(channel string) [messagesToFetch]string {
 	client := twitch.NewAnonymousClient()
 	client.Join(channel)
 	client.OnPrivateMessage(func(message twitch.PrivateMessage) {
-		// fmt.Println(message.Message)
 		messages[count] = message.Message
 		count++
 		if count >= messagesToFetch {

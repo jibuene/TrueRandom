@@ -2,9 +2,10 @@ package randomnumber
 
 import (
 	"fmt"
-	"github.com/jibuene/true-rand/twitch"
 	"math/big"
 	"strconv"
+
+	twitchmsg "github.com/jibuene/true-rand/twitch"
 )
 
 const NotRandomNumber = 42
@@ -86,6 +87,8 @@ func numberFromString(strings ...string) *big.Int {
 	if !success {
 		panic("Failed to convert string to big.Int")
 	}
+
+	bigInt = bigInt.Mod(bigInt, big.NewInt(1_337_000))
 
 	return bigInt
 }
